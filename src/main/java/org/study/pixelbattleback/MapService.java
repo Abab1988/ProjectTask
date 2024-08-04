@@ -106,7 +106,6 @@ public class MapService {
         if (!isChanged) {
             return;
         }
-        System.out.println("SAVE");
         isChanged = false;
         try (FileOutputStream fileOutputStream = new FileOutputStream(MAP_BIN);
              ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream)) {
