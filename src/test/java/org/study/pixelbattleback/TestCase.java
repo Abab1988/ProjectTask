@@ -1,5 +1,6 @@
 package org.study.pixelbattleback;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,13 @@ public class TestCase {
     private static final int REQUEST_COUNT = 100;
 
     public static final String URL = "http://127.0.0.1:8080/drawPixel";
+
+    @BeforeEach
+    public void up() {
+        final RestTemplate rest = new RestTemplate();
+        PixelRequest pixel = new PixelRequest(0, 0, 0);
+        ResultResponse res = rest.postForObject(URL, pixel, ResultResponse.class);
+    }
 
     @Test
     public void testParallel() {

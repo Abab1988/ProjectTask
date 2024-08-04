@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -24,30 +25,29 @@ public class MapService {
 
     public static final String MAP_BIN = "map.bin";
 
-    private final int width;
+    private final static int width = 100;
 
-    private final int height;
+    private final static int height = 100;
 
     private final int[] colors;
 
-    private boolean isChanged;
+    private volatile boolean isChanged;
 
-    private ReentrantLock[] locks;
+    private final static ReadWriteLock[] locks;
 
-    private Set<ReentrantLock> locksSet = ConcurrentHashMap.newKeySet();
+    static {
+        locks = new ReentrantReadWriteLock[100 * 100];
+        for (int i = 0; i < 10000; i++) {
+            locks[i] = new ReentrantReadWriteLock();
+        }
+    }
 
     /**
      * Пытаемся загрузить карту из файла на старте, или же начинаем с пустой карты
      */
     public MapService() {
         Map tmp = new Map();
-        tmp.setWidth(100);
-        tmp.setHeight(100);
-        tmp.setColors(new int[tmp.getWidth() * tmp.getHeight()]);
-        ReentrantLock[] locks = new ReentrantLock[tmp.getWidth() * tmp.getHeight()];
-        for (int i = 0; i < locks.length; i++) {
-            locks[i] = new ReentrantLock();
-        }
+        tmp.setColors(new int[width * height]);
         try (FileInputStream fileInputStream = new FileInputStream(MAP_BIN);
             ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream)) {
             Object o = objectInputStream.readObject();
@@ -55,10 +55,7 @@ public class MapService {
         } catch (Exception e) {
             logger.error("Загрузка не удалась, начинаем с пустой карты. " + e.getMessage(), e);
         }
-        width = tmp.getWidth();
-        height = tmp.getHeight();
         colors = tmp.getColors();
-        this.locks = locks;
     }
 
     /**
@@ -86,8 +83,9 @@ public class MapService {
     private int[] getColors() {
         int[] copy = new int[colors.length];
         for (int i = 0; i < colors.length; i++) {
-            copy[i] = getValueByID(i);
-            releaseLock(i);
+            locks[i].readLock().lock();
+            copy[i] = colors[i];
+            locks[i].readLock().unlock();
         }
         return copy;
     }
@@ -104,10 +102,11 @@ public class MapService {
      * Периодически сохраняем карту в файл
      */
     @Scheduled(fixedDelay = 15, timeUnit = TimeUnit.SECONDS)
-    public synchronized void writeToFile() {
+    public void writeToFile() {
         if (!isChanged) {
             return;
         }
+        System.out.println("SAVE");
         isChanged = false;
         try (FileOutputStream fileOutputStream = new FileOutputStream(MAP_BIN);
              ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream)) {
@@ -118,45 +117,10 @@ public class MapService {
         }
     }
 
-    private void attainLock(int key) {
-        final ReentrantLock lock = locks[key];
-        lock.lock();
-        locksSet.add(lock);
-    }
-
-    private void releaseLock(ReentrantLock lock) {
-        if (!locksSet.contains(lock)) {
-            throw new IllegalStateException("");
-        }
-        locksSet.remove(lock);
-        lock.unlock();
-    }
-
-    private void releaseLock(int key) {
-        final ReentrantLock lock = locks[key];
-        releaseLock(lock);
-    }
-
-    private void releaseLocks() {
-        for (ReentrantLock reentrantLock : locksSet) {
-            releaseLock(reentrantLock);
-        }
-    }
-
     public void setValueByID(int key, int value) {
-        attainLock(key);
+        locks[key].writeLock().lock();
         colors[key] = value;
-        releaseLock(key);
+        locks[key].writeLock().unlock();
     }
-
-    public int getValueByID(int key) {
-        attainLock(key);
-        return colors[key];
-    }
-
-    public void commit() {
-        releaseLocks();
-    }
-
 
 }
