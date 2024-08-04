@@ -36,8 +36,8 @@ public class MapService {
     private final static ReadWriteLock[] locks;
 
     static {
-        locks = new ReentrantReadWriteLock[100 * 100];
-        for (int i = 0; i < 10000; i++) {
+        locks = new ReentrantReadWriteLock[width * height];
+        for (int i = 0; i < locks.length; i++) {
             locks[i] = new ReentrantReadWriteLock();
         }
     }
@@ -85,6 +85,9 @@ public class MapService {
         for (int i = 0; i < colors.length; i++) {
             locks[i].readLock().lock();
             copy[i] = colors[i];
+        }
+        // Держим блокировки, чтобы не сохранить состояние карты, которого не было никогда
+        for(int i = 0; i < colors.length; i++) {
             locks[i].readLock().unlock();
         }
         return copy;
@@ -108,7 +111,7 @@ public class MapService {
         }
         isChanged = false;
         try (FileOutputStream fileOutputStream = new FileOutputStream(MAP_BIN);
-             ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream)) {
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream)) {
             objectOutputStream.writeObject(getMap());
             logger.info("Карта сохранена в файле {}", MAP_BIN);
         } catch (Exception e) {

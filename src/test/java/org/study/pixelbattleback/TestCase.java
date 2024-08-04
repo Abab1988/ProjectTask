@@ -20,7 +20,7 @@ public class TestCase {
 
     private static final int THREAD_COUNT = 100;
 
-    private static final int REQUEST_COUNT = 100;
+    private static final int REQUEST_COUNT = 300;
 
     public static final String URL = "http://127.0.0.1:8080/drawPixel";
 
